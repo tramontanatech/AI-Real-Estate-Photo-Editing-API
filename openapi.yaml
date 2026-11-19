@@ -1,0 +1,876 @@
+openapi: 3.1.0
+info:
+  title: Stager AI Real Estate Photo Editing API
+  version: "1.0.0"
+  summary: HDR bracket merging, virtual staging, virtual renovation, sky and lawn replacement, decluttering and listing videos.
+  description: |
+    Automate real estate photo editing at any volume. Stager AI merges bracketed
+    exposures into HDR photos, fixes lens distortion and verticals, pulls windows,
+    stages and renovates rooms, swaps skies and lawns, and builds listing videos.
+
+    Most responses are wrapped in `{ "status": "success", "data": { ... } }`.
+    Errors return a 4xx status with `{ "message": "..." }`.
+
+    Full guide: https://stagerai.com/api-docs
+  contact:
+    name: Stager AI
+    url: https://stagerai.com/api-docs
+  license:
+    name: MIT (this specification)
+    identifier: MIT
+externalDocs:
+  url: https://stagerai.com/api-docs
+servers:
+  - url: https://api.stagerai.com
+security:
+  - apiKey: []
+tags:
+  - name: Account
+  - name: HDR batch
+    description: Upload every photo of a listing; brackets are grouped automatically from EXIF data.
+  - name: HDR single bracket
+    description: Upload one bracket group (1 to 7 exposures) at a time.
+  - name: TV screens
+  - name: AI edits
+    description: Virtual staging, renovation, lawn and sky replacement, declutter.
+  - name: Video
+paths:
+  /api/photos-quota:
+    get:
+      tags: [Account]
+      summary: Check your photo credits
+      operationId: getPhotosQuota
+      responses:
+        "200":
+          description: Credits left
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      photosQuota: { type: integer }
+  /api/projects:
+    post:
+      tags: [Account]
+      summary: Create a project (one per listing)
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, example: "123 Main Street" }
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectEnvelope" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-batch:
+    post:
+      tags: [HDR batch]
+      summary: Create an HDR batch
+      operationId: createHdrBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HdrOptions" }
+      responses:
+        "201":
+          description: Batch created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      batchId: { type: string }
+                      clientReferenceId: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-batch/{batchId}/url:
+    post:
+      tags: [HDR batch]
+      summary: Get a signed upload URL for one photo
+      description: PUT the file to the returned URL. For JPEG, PNG, TIFF, HEIC, WebP and DNG send the matching Content-Type; raw files go without one.
+      operationId: getHdrBatchUploadUrl
+      parameters:
+        - $ref: "#/components/parameters/batchId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename: { type: string, example: living_room_1.jpg }
+      responses:
+        "201":
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      url: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-batch/{batchId}/enhance:
+    post:
+      tags: [HDR batch]
+      summary: Group the brackets and start processing
+      operationId: enhanceHdrBatch
+      parameters:
+        - $ref: "#/components/parameters/batchId"
+      responses:
+        "201": { description: Processing started }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-batch/{batchId}:
+    get:
+      tags: [HDR batch]
+      summary: Get the batch results
+      description: Poll every 30 to 40 seconds. Done when `processing` is false and every result has an `imageUrl` or `status` "error".
+      operationId: getHdrBatch
+      parameters:
+        - $ref: "#/components/parameters/batchId"
+        - $ref: "#/components/parameters/format"
+      responses:
+        "200":
+          description: Batch status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data: { $ref: "#/components/schemas/HdrBatchStatus" }
+  /api/hdr-image-group:
+    post:
+      tags: [HDR single bracket]
+      summary: Create an HDR group (one bracket set)
+      operationId: createHdrGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/HdrOptions" }
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      groupId: { type: string }
+                      clientReferenceId: { type: string }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-upload-url:
+    post:
+      tags: [HDR single bracket]
+      summary: Get a signed upload URL for one exposure
+      description: Up to 7 exposures per group. PUT the file to `uploadUrl`.
+      operationId: getHdrGroupUploadUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groupId, filename]
+              properties:
+                groupId: { type: string }
+                filename: { type: string, example: living_room_exposure_1.jpg }
+      responses:
+        "201":
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      uploadUrl: { type: string, format: uri }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-enhance:
+    post:
+      tags: [HDR single bracket]
+      summary: Merge the uploaded exposures
+      operationId: enhanceHdrGroup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groupId]
+              properties:
+                groupId: { type: string }
+                tvLogoId:
+                  type: string
+                  description: Id of a TV screen image to place on the TV.
+      responses:
+        "201": { description: Processing started }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/hdr-image-group/{groupId}:
+    get:
+      tags: [HDR single bracket]
+      summary: Get the HDR group status and result
+      description: Poll every 5 to 10 seconds. A group usually takes 1 to 5 minutes.
+      operationId: getHdrGroup
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: "#/components/parameters/format"
+      responses:
+        "200":
+          description: Group status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data: { $ref: "#/components/schemas/HdrGroupStatus" }
+  /api/tv-screen-images:
+    get:
+      tags: [TV screens]
+      summary: List your TV screen images
+      operationId: listTvScreenImages
+      parameters:
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: TV screen images, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/TvScreenImage" }
+                      total: { type: integer }
+    post:
+      tags: [TV screens]
+      summary: Upload a TV screen image or logo
+      operationId: uploadTvScreenImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "JPEG, PNG, WebP or HEIC, up to 25 MB" }
+      responses:
+        "201":
+          description: Uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  data: { $ref: "#/components/schemas/TvScreenImage" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/image:
+    post:
+      tags: [AI edits, Video]
+      summary: Upload a photo for AI edits or videos
+      operationId: uploadImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        "201":
+          description: Uploaded. `data.id` is the imageId.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      imageUrl: { type: string, format: uri }
+                      width: { type: integer }
+                      height: { type: integer }
+  /api/images/{imageId}/stage:
+    post:
+      tags: [AI edits]
+      summary: Virtual staging
+      operationId: stageImage
+      parameters: [{ $ref: "#/components/parameters/imageId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomType, roomStyle]
+              properties:
+                roomType: { $ref: "#/components/schemas/RoomType" }
+                roomStyle: { $ref: "#/components/schemas/RoomStyle" }
+                actionType: { type: string, enum: [subtleStaging, autoStaging] }
+                colorTypes: { type: array, items: { $ref: "#/components/schemas/ColorType" } }
+                removeFurniture: { type: boolean }
+                extraInstructions: { type: string }
+      responses:
+        "201": { $ref: "#/components/responses/Generation" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/images/{imageId}/renovate:
+    post:
+      tags: [AI edits]
+      summary: Virtual renovation
+      operationId: renovateImage
+      parameters: [{ $ref: "#/components/parameters/imageId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roomType]
+              properties:
+                roomType: { $ref: "#/components/schemas/RoomType" }
+                roomStyle: { $ref: "#/components/schemas/RoomStyle" }
+                colorTypes: { type: array, items: { $ref: "#/components/schemas/ColorType" } }
+                extraInstructions: { type: string }
+      responses:
+        "201": { $ref: "#/components/responses/Generation" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/images/{imageId}/lawn-replace:
+    post:
+      tags: [AI edits]
+      summary: Lawn replacement
+      operationId: lawnReplace
+      parameters: [{ $ref: "#/components/parameters/imageId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                lawnType: { type: string, enum: [light, medium, strong] }
+                extraInstructions: { type: string }
+      responses:
+        "201": { $ref: "#/components/responses/Generation" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/images/{imageId}/sky-replace:
+    post:
+      tags: [AI edits]
+      summary: Sky replacement (blue sky or twilight)
+      operationId: skyReplace
+      parameters: [{ $ref: "#/components/parameters/imageId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [skyType]
+              properties:
+                skyType: { type: string, enum: [blue, twilight] }
+                skySubType: { type: string, enum: [subtle, middle, dramatic], description: Twilight only }
+      responses:
+        "201": { $ref: "#/components/responses/Generation" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/images/{imageId}/declutter:
+    post:
+      tags: [AI edits]
+      summary: Declutter (remove furniture and objects)
+      operationId: declutterImage
+      parameters: [{ $ref: "#/components/parameters/imageId" }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                extraInstructions: { type: string }
+      responses:
+        "201": { $ref: "#/components/responses/Generation" }
+        "400": { $ref: "#/components/responses/Error" }
+  /api/generations/{generationId}:
+    get:
+      tags: [AI edits]
+      summary: Get an edit result
+      description: Poll every 5 to 10 seconds. `imageUrl` is a signed link that expires.
+      operationId: getGeneration
+      parameters:
+        - name: generationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Generation" }
+  /api/audio:
+    get:
+      tags: [Video]
+      summary: List the music library
+      operationId: listAudio
+      responses:
+        "200":
+          description: Tracks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string }
+                            name: { type: string }
+                            url: { type: string, format: uri }
+                            isCustom: { type: boolean }
+  /api/videos:
+    get:
+      tags: [Video]
+      summary: List your videos
+      operationId: listVideos
+      parameters:
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+      responses:
+        "200":
+          description: Videos
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items: { type: array, items: { $ref: "#/components/schemas/Video" } }
+                      total: { type: integer }
+    post:
+      tags: [Video]
+      summary: Create a video
+      operationId: createVideo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orientation]
+              properties:
+                title: { type: string }
+                orientation: { type: string, enum: [horizontal, vertical] }
+                audioId: { type: string }
+      responses:
+        "201":
+          description: Video created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Video" }
+  /api/videos/{videoId}:
+    get:
+      tags: [Video]
+      summary: Get a video
+      operationId: getVideo
+      parameters: [{ $ref: "#/components/parameters/videoId" }]
+      responses:
+        "200":
+          description: Video with clips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: "#/components/schemas/Video" }
+  /api/videos/{videoId}/clips:
+    post:
+      tags: [Video]
+      summary: Add a clip (scene of 1 to 5 photos)
+      operationId: addClip
+      parameters: [{ $ref: "#/components/parameters/videoId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Clip" }
+      responses:
+        "201":
+          description: Clip added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      id: { type: string }
+  /api/videos/{videoId}/clips/{clipId}:
+    put:
+      tags: [Video]
+      summary: Edit a clip
+      operationId: updateClip
+      parameters:
+        - $ref: "#/components/parameters/videoId"
+        - $ref: "#/components/parameters/clipId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Clip" }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+    delete:
+      tags: [Video]
+      summary: Delete a clip
+      operationId: deleteClip
+      parameters:
+        - $ref: "#/components/parameters/videoId"
+        - $ref: "#/components/parameters/clipId"
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+  /api/videos/{videoId}/render:
+    post:
+      tags: [Video]
+      summary: Render the video
+      description: Usually takes 5 to 30 minutes.
+      operationId: renderVideo
+      parameters: [{ $ref: "#/components/parameters/videoId" }]
+      responses:
+        "201": { description: Render started }
+  /api/videos/{videoId}/progress:
+    get:
+      tags: [Video]
+      summary: Check the render progress
+      operationId: getRenderProgress
+      parameters: [{ $ref: "#/components/parameters/videoId" }]
+      responses:
+        "200":
+          description: Progress
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [progress, done, error] }
+                  progress: { type: number }
+                  url: { type: string, format: uri }
+                  size: { type: integer }
+                  message: { type: string }
+webhooks:
+  hdr.image.completed:
+    post:
+      summary: A bracket group finished
+      description: "Signed with HMAC-SHA256 of `${X-Stager-Timestamp}.${rawBody}` in `X-Stager-Signature: sha256=<hex>`."
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookEvent" }
+      responses:
+        "200": { description: Acknowledged }
+  hdr.image.failed:
+    post:
+      summary: A bracket group failed
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookEvent" }
+      responses:
+        "200": { description: Acknowledged }
+  edit.completed:
+    post:
+      summary: An AI edit finished
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookEvent" }
+      responses:
+        "200": { description: Acknowledged }
+  edit.failed:
+    post:
+      summary: An AI edit failed
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/WebhookEvent" }
+      responses:
+        "200": { description: Acknowledged }
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: stager-api-key
+  parameters:
+    batchId:
+      name: batchId
+      in: path
+      required: true
+      schema: { type: string }
+    imageId:
+      name: imageId
+      in: path
+      required: true
+      description: Id from POST /api/image, or the groupId of a finished HDR photo.
+      schema: { type: string }
+    videoId:
+      name: videoId
+      in: path
+      required: true
+      schema: { type: string }
+    clipId:
+      name: clipId
+      in: path
+      required: true
+      schema: { type: string }
+    format:
+      name: format
+      in: query
+      schema: { type: string, enum: [jpg, png], default: jpg }
+    offset:
+      name: offset
+      in: query
+      schema: { type: integer, default: 0 }
+    limit:
+      name: limit
+      in: query
+      schema: { type: integer, default: 50, maximum: 100 }
+  responses:
+    Error:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+              codeKey: { type: string }
+    Success:
+      description: Done
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                properties:
+                  success: { type: boolean }
+    Generation:
+      description: The edit (runs in the background)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string }
+              data: { $ref: "#/components/schemas/Generation" }
+  schemas:
+    ProjectEnvelope:
+      type: object
+      properties:
+        status: { type: string }
+        data:
+          type: object
+          properties:
+            id: { type: string }
+            title: { type: string }
+    HdrOptions:
+      type: object
+      required: [projectId]
+      properties:
+        projectId: { type: string }
+        lensCorrection: { type: boolean }
+        perspectiveCorrection: { type: boolean }
+        photographerRemoval: { type: boolean }
+        fireplaceEnhancement: { type: boolean }
+        tvScreenReplacement: { type: boolean }
+        autoPrivacy: { type: boolean }
+        blurLicensePlates: { type: boolean }
+        skyReplacement: { type: boolean, default: true }
+        lawnReplacement: { type: boolean, default: false }
+        editingStyle:
+          type: integer
+          enum: [15, 13]
+          default: 15
+          description: 15 = Stager Luma, 13 = Stager Classic V2
+        clientReferenceId: { type: string }
+    HdrGroupStatus:
+      type: object
+      properties:
+        status: { type: string, enum: [processing, completed, error] }
+        imageUrl: { type: string, format: uri }
+        originalImageUrl: { type: string, format: uri }
+        filename: { type: string }
+        clientReferenceId: { type: string }
+        lawnReplacement: { type: string, enum: [applied, skipped, failed] }
+        tvLogo: { type: string, enum: [applied, skipped, failed] }
+        code: { $ref: "#/components/schemas/HdrErrorCode" }
+        errorMessage: { type: string }
+    HdrBatchStatus:
+      type: object
+      properties:
+        processing: { type: boolean }
+        status: { type: string, enum: [processing, completed, error] }
+        message: { type: string }
+        clientReferenceId: { type: string }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              groupId: { type: string, description: Also the imageId of the HDR photo for AI edits. }
+              imageUrl: { type: string, format: uri }
+              originalImageUrl: { type: string, format: uri }
+              filename: { type: string }
+              processing: { type: boolean }
+              status: { type: string, enum: [error] }
+              code: { $ref: "#/components/schemas/HdrErrorCode" }
+              errorMessage: { type: string }
+              lawnReplacement: { type: string, enum: [applied, skipped, failed] }
+    HdrErrorCode:
+      type: integer
+      description: |
+        1 no credits left, 2 merge failed, 3 edits failed, 4 style failed, 5 timeout,
+        6 no images, 7 conversion failed, 8 max retries, 9 generation failed,
+        10 more than 7 brackets, 11 alignment failed.
+      enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    TvScreenImage:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        url: { type: string, format: uri }
+        thumbnailUrl: { type: string, format: uri }
+        width: { type: integer }
+        height: { type: integer }
+        createdAt: { type: string, format: date-time }
+    Generation:
+      type: object
+      properties:
+        generationId: { type: string }
+        imageId: { type: string }
+        actionType: { type: string }
+        status: { type: string, enum: [processing, completed, failed] }
+        resultId: { type: string }
+        imageUrl: { type: string, format: uri }
+        width: { type: integer }
+        height: { type: integer }
+    RoomType:
+      type: string
+      enum: [LIVING_ROOM, DINING_ROOM, BEDROOM, KITCHEN, KITCHEN_LIVING_AREA, HOME_OFFICE, TERRACE, BALCONY, BATHROOM, EXTERIOR, GAME_ROOM, KIDS_ROOM, GARAGE, GYM, NURSERY, BASEMENT, BACKYARD, ENTRYWAY]
+    RoomStyle:
+      type: string
+      enum: [modern, minimalist, scandinavian, industrial, rustic, farmhouse, kidsRoom, coastalModern, luxury, midCentury, bohoChic, japandi]
+    ColorType:
+      type: string
+      enum: [classicWhite, charcoalGray, matteBlack, beige, espressoBrown, walnut, naturalWood, navyBlue, forestGreen, rusticOak, ivory, steelBlue, ashGray, mahogany]
+    Clip:
+      type: object
+      properties:
+        images:
+          type: array
+          items:
+            type: object
+            required: [id, order]
+            properties:
+              id: { type: string }
+              order: { type: integer }
+        customInstructions: { type: string }
+        effect:
+          type: integer
+          minimum: 0
+          maximum: 13
+          description: |
+            0 default, 1 SlowMotionWalkthrough, 2 SlowMotionAerial, 3 FastSpeedRamps,
+            4 SplitScreen, 5 ExteriorToInterior, 6 StagingFurnitureAppears, 7 DawnToNoon,
+            8 DayToNight, 9 StarryNight, 10 SummerToWinter, 11 HouseLandsOnTerrain,
+            12 HouseBuildsUp, 13 Renovation
+        cameraMotion:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: |
+            Only with effect 1. 0 default, 1 pushIn, 2 pushOut, 3 slowMoDescending,
+            4 slowMoElevating, 5 orbitRight, 6 orbitLeft
+    Video:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        orientation: { type: string, enum: [horizontal, vertical] }
+        videoType: { type: string }
+        videoUrl: { type: [string, "null"], format: uri }
+        createdAt: { type: string, format: date-time }
+        clips:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              order: { type: integer }
+              videoUrl: { type: string, format: uri }
+              images:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    imageId: { type: string }
+                    url: { type: string, format: uri }
+                    isGeneration: { type: boolean }
+    WebhookEvent:
+      type: object
+      properties:
+        eventId: { type: string, description: Unique per event; use it to drop duplicates. }
+        eventType: { type: string, enum: [hdr.image.completed, hdr.image.failed, edit.completed, edit.failed] }
+        createdAt: { type: string, format: date-time }
+        data: { type: object }

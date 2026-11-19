@@ -1,0 +1,69 @@
+{
+  "name": "stagerai",
+  "version": "1.0.0",
+  "description": "Official Node.js / TypeScript SDK for the Stager AI real estate photo editing API: HDR bracket merging, virtual staging, virtual renovation, sky and lawn replacement, decluttering and listing videos.",
+  "keywords": [
+    "real-estate",
+    "real-estate-photography",
+    "photo-editing-api",
+    "hdr",
+    "hdr-merge",
+    "bracketing",
+    "virtual-staging",
+    "virtual-renovation",
+    "sky-replacement",
+    "day-to-dusk",
+    "lawn-replacement",
+    "declutter",
+    "window-pull",
+    "perspective-correction",
+    "property-video",
+    "proptech",
+    "stager-ai",
+    "sdk"
+  ],
+  "homepage": "https://stagerai.com/api-docs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tramontanatech/AI-Real-Estate-Photo-Editing-API.git",
+    "directory": "typescript"
+  },
+  "bugs": "https://github.com/tramontanatech/AI-Real-Estate-Photo-Editing-API/issues",
+  "license": "MIT",
+  "author": "Stager AI (https://stagerai.com)",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/cjs-package.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "prepublishOnly": "npm test && cp ../LICENSE ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stagerai"
+version = "1.0.0"
+description = "Official Python SDK for the Stager AI real estate photo editing API: HDR bracket merging, virtual staging, virtual renovation, sky and lawn replacement, decluttering and listing videos."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "Stager AI" }]
+dependencies = ["requests>=2.25"]
+keywords = [
+  "real estate", "real estate photography", "photo editing api", "hdr", "hdr merge",
+  "bracketing", "virtual staging", "virtual renovation", "sky replacement",
+  "day to dusk", "lawn replacement", "declutter", "window pull", "proptech", "stager ai",
+]
+classifiers = [
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Multimedia :: Graphics",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://stagerai.com"
+Documentation = "https://stagerai.com/api-docs"
+Repository = "https://github.com/tramontanatech/AI-Real-Estate-Photo-Editing-API"
+Issues = "https://github.com/tramontanatech/AI-Real-Estate-Photo-Editing-API/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/stagerai"]
