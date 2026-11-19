@@ -178,7 +178,7 @@ Examples: [Node.js (no framework)](examples/node/webhook-server.mjs) · [Python 
 
 ## Supported files
 
-Canon (CR3, CR2), Nikon (NEF, NRW), Sony (ARW, SRF), Fujifilm (RAF), Panasonic (RW2), DNG, JPEG, PNG and TIFF.
+Canon (CR3, CR2), Nikon (NEF, NRW), Sony (ARW, SRF), Fujifilm (RAF), Panasonic (RW2), Adobe DNG, JPEG, PNG and TIFF.
 
 ## HDR error codes
 
